@@ -8,16 +8,18 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/traefikx/backend/internal/models"
+	"github.com/traefikx/backend/internal/services"
 	"gorm.io/gorm"
 )
 
 // TraefikProviderHandler generates dynamic configuration for Traefik
 type TraefikProviderHandler struct {
-	db *gorm.DB
+	db         *gorm.DB
+	aggregator *services.AggregatorService
 }
 
-func NewTraefikProviderHandler(db *gorm.DB) *TraefikProviderHandler {
-	return &TraefikProviderHandler{db: db}
+func NewTraefikProviderHandler(db *gorm.DB, aggregator *services.AggregatorService) *TraefikProviderHandler {
+	return &TraefikProviderHandler{db: db, aggregator: aggregator}
 }
 
 // TraefikDynamicConfig represents the full dynamic configuration
@@ -63,6 +65,8 @@ type HealthCheck struct {
 }
 
 // GenerateConfig generates the dynamic configuration for Traefik
+// This merges local configuration with external endpoint configurations
+// Priority: Local (highest) > External endpoints (by priority)
 func (h *TraefikProviderHandler) GenerateConfig(c *gin.Context) {
 	config := &TraefikDynamicConfig{
 		HTTP: &HTTPConfig{
@@ -89,6 +93,11 @@ func (h *TraefikProviderHandler) GenerateConfig(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch middlewares"})
 		return
 	}
+
+	// Track local items for conflict detection
+	localRouters := make(map[string]bool)
+	localServices := make(map[string]bool)
+	localMiddlewares := make(map[string]bool)
 
 	// Generate router and service configs
 	for _, router := range routers {
@@ -131,11 +140,13 @@ func (h *TraefikProviderHandler) GenerateConfig(c *gin.Context) {
 			Middlewares: middlewareNames,
 			TLS:         tlsConfig,
 		}
+		localRouters[router.Name] = true
 
 		// Add service to config
 		if _, exists := config.HTTP.Services[router.Service.Name]; !exists {
 			serviceConfig := buildServiceConfig(&router.Service)
 			config.HTTP.Services[router.Service.Name] = serviceConfig
+			localServices[router.Service.Name] = true
 		}
 	}
 
@@ -144,6 +155,7 @@ func (h *TraefikProviderHandler) GenerateConfig(c *gin.Context) {
 		middlewareConfig := buildMiddlewareConfig(&middleware)
 		if middlewareConfig != nil {
 			config.HTTP.Middlewares[middleware.Name] = middlewareConfig
+			localMiddlewares[middleware.Name] = true
 		}
 	}
 
@@ -158,10 +170,275 @@ func (h *TraefikProviderHandler) GenerateConfig(c *gin.Context) {
 					Permanent: true,
 				},
 			}
+			localMiddlewares[middlewareName] = true
 		}
 	}
 
+	// Merge external endpoint configurations (if aggregator is available)
+	if h.aggregator != nil {
+		h.mergeExternalConfigs(config, localRouters, localServices, localMiddlewares)
+	}
+
 	c.JSON(http.StatusOK, config)
+}
+
+// mergeExternalConfigs merges configurations from external endpoints
+func (h *TraefikProviderHandler) mergeExternalConfigs(config *TraefikDynamicConfig, localRouters, localServices, localMiddlewares map[string]bool) {
+	// Convert local configs to interface{} maps for aggregator
+	localRoutersMap := make(map[string]interface{})
+	localServicesMap := make(map[string]interface{})
+	localMiddlewaresMap := make(map[string]interface{})
+
+	for name := range localRouters {
+		if router, exists := config.HTTP.Routers[name]; exists {
+			localRoutersMap[name] = convertRouterConfigToMap(router)
+		}
+	}
+	for name := range localServices {
+		if service, exists := config.HTTP.Services[name]; exists {
+			localServicesMap[name] = convertServiceConfigToMap(service)
+		}
+	}
+	for name := range localMiddlewares {
+		if middleware, exists := config.HTTP.Middlewares[name]; exists {
+			localMiddlewaresMap[name] = convertMiddlewareConfigToMap(middleware)
+		}
+	}
+
+	// Get merged config from aggregator
+	mergedConfig, conflicts := h.aggregator.GetMergedConfig(localRoutersMap, localServicesMap, localMiddlewaresMap)
+
+	// Log conflicts for debugging
+	for _, conflict := range conflicts {
+		fmt.Printf("Config conflict: %s '%s' from '%s' overridden by '%s' (priority: %d)\n",
+			conflict.Type, conflict.Name, conflict.Source, conflict.OverriddenBy, conflict.SourcePriority)
+	}
+
+	// Merge external routers (skip if local already has it)
+	for name, router := range mergedConfig.HTTP.Routers {
+		if _, exists := localRouters[name]; !exists {
+			if routerMap, ok := router.(map[string]interface{}); ok {
+				config.HTTP.Routers[name] = convertMapToRouterConfig(routerMap)
+			}
+		}
+	}
+
+	// Merge external services
+	for name, service := range mergedConfig.HTTP.Services {
+		if _, exists := localServices[name]; !exists {
+			if serviceMap, ok := service.(map[string]interface{}); ok {
+				config.HTTP.Services[name] = convertMapToServiceConfig(serviceMap)
+			}
+		}
+	}
+
+	// Merge external middlewares
+	for name, middleware := range mergedConfig.HTTP.Middlewares {
+		if _, exists := localMiddlewares[name]; !exists {
+			if middlewareMap, ok := middleware.(map[string]interface{}); ok {
+				config.HTTP.Middlewares[name] = convertMapToMiddlewareConfig(middlewareMap)
+			}
+		}
+	}
+}
+
+// Helper functions for converting between config types and maps
+func convertRouterConfigToMap(router *RouterConfig) map[string]interface{} {
+	result := map[string]interface{}{
+		"entryPoints": router.EntryPoints,
+		"rule":        router.Rule,
+		"service":     router.Service,
+	}
+	if len(router.Middlewares) > 0 {
+		result["middlewares"] = router.Middlewares
+	}
+	if router.TLS != nil {
+		result["tls"] = map[string]interface{}{
+			"certResolver": router.TLS.CertResolver,
+		}
+	}
+	return result
+}
+
+func convertServiceConfigToMap(service *ServiceConfig) map[string]interface{} {
+	if service.LoadBalancer == nil {
+		return nil
+	}
+	servers := make([]map[string]string, len(service.LoadBalancer.Servers))
+	for i, s := range service.LoadBalancer.Servers {
+		servers[i] = map[string]string{"url": s.URL}
+	}
+	lbConfig := map[string]interface{}{
+		"servers":        servers,
+		"passHostHeader": service.LoadBalancer.PassHostHeader,
+	}
+	if service.LoadBalancer.HealthCheck != nil {
+		lbConfig["healthCheck"] = map[string]interface{}{
+			"path":     service.LoadBalancer.HealthCheck.Path,
+			"interval": service.LoadBalancer.HealthCheck.Interval,
+		}
+	}
+	return map[string]interface{}{
+		"loadBalancer": lbConfig,
+	}
+}
+
+func convertMiddlewareConfigToMap(middleware *MiddlewareConfig) map[string]interface{} {
+	if middleware.RedirectScheme != nil {
+		return map[string]interface{}{
+			"redirectScheme": map[string]interface{}{
+				"scheme":    middleware.RedirectScheme.Scheme,
+				"port":      middleware.RedirectScheme.Port,
+				"permanent": middleware.RedirectScheme.Permanent,
+			},
+		}
+	}
+	if middleware.Headers != nil {
+		result := map[string]interface{}{}
+		if len(middleware.Headers.CustomRequestHeaders) > 0 {
+			result["customRequestHeaders"] = middleware.Headers.CustomRequestHeaders
+		}
+		if len(middleware.Headers.CustomResponseHeaders) > 0 {
+			result["customResponseHeaders"] = middleware.Headers.CustomResponseHeaders
+		}
+		if middleware.Headers.SSLRedirect {
+			result["sslRedirect"] = true
+		}
+		return map[string]interface{}{"headers": result}
+	}
+	if middleware.StripPrefix != nil {
+		return map[string]interface{}{
+			"stripPrefix": map[string]interface{}{
+				"prefixes":   middleware.StripPrefix.Prefixes,
+				"forceSlash": middleware.StripPrefix.ForceSlash,
+			},
+		}
+	}
+	if middleware.AddPrefix != nil {
+		return map[string]interface{}{
+			"addPrefix": map[string]interface{}{
+				"prefix": middleware.AddPrefix.Prefix,
+			},
+		}
+	}
+	return nil
+}
+
+func convertMapToRouterConfig(routerMap map[string]interface{}) *RouterConfig {
+	config := &RouterConfig{}
+	if eps, ok := routerMap["entryPoints"].([]interface{}); ok {
+		config.EntryPoints = make([]string, len(eps))
+		for i, ep := range eps {
+			config.EntryPoints[i] = fmt.Sprintf("%v", ep)
+		}
+	}
+	if rule, ok := routerMap["rule"].(string); ok {
+		config.Rule = rule
+	}
+	if service, ok := routerMap["service"].(string); ok {
+		config.Service = service
+	}
+	if middlewares, ok := routerMap["middlewares"].([]interface{}); ok {
+		config.Middlewares = make([]string, len(middlewares))
+		for i, m := range middlewares {
+			config.Middlewares[i] = fmt.Sprintf("%v", m)
+		}
+	}
+	if tls, ok := routerMap["tls"].(map[string]interface{}); ok {
+		config.TLS = &TLSConfig{}
+		if cr, ok := tls["certResolver"].(string); ok {
+			config.TLS.CertResolver = cr
+		}
+	}
+	return config
+}
+
+func convertMapToServiceConfig(serviceMap map[string]interface{}) *ServiceConfig {
+	config := &ServiceConfig{}
+	if lb, ok := serviceMap["loadBalancer"].(map[string]interface{}); ok {
+		config.LoadBalancer = &LoadBalancerConfig{}
+		if servers, ok := lb["servers"].([]interface{}); ok {
+			config.LoadBalancer.Servers = make([]ServerConfig, len(servers))
+			for i, s := range servers {
+				if serverMap, ok := s.(map[string]interface{}); ok {
+					if url, ok := serverMap["url"].(string); ok {
+						config.LoadBalancer.Servers[i] = ServerConfig{URL: url}
+					}
+				}
+			}
+		}
+		if phh, ok := lb["passHostHeader"].(bool); ok {
+			config.LoadBalancer.PassHostHeader = phh
+		}
+		if hc, ok := lb["healthCheck"].(map[string]interface{}); ok {
+			config.LoadBalancer.HealthCheck = &HealthCheck{}
+			if path, ok := hc["path"].(string); ok {
+				config.LoadBalancer.HealthCheck.Path = path
+			}
+			if interval, ok := hc["interval"].(string); ok {
+				config.LoadBalancer.HealthCheck.Interval = interval
+			}
+		}
+	}
+	return config
+}
+
+func convertMapToMiddlewareConfig(middlewareMap map[string]interface{}) *MiddlewareConfig {
+	config := &MiddlewareConfig{}
+
+	if rs, ok := middlewareMap["redirectScheme"].(map[string]interface{}); ok {
+		config.RedirectScheme = &RedirectSchemeConfig{}
+		if scheme, ok := rs["scheme"].(string); ok {
+			config.RedirectScheme.Scheme = scheme
+		}
+		if port, ok := rs["port"].(string); ok {
+			config.RedirectScheme.Port = port
+		}
+		if permanent, ok := rs["permanent"].(bool); ok {
+			config.RedirectScheme.Permanent = permanent
+		}
+	}
+
+	if headers, ok := middlewareMap["headers"].(map[string]interface{}); ok {
+		config.Headers = &HeadersConfig{}
+		if crh, ok := headers["customRequestHeaders"].(map[string]interface{}); ok {
+			config.Headers.CustomRequestHeaders = make(map[string]string)
+			for k, v := range crh {
+				config.Headers.CustomRequestHeaders[k] = fmt.Sprintf("%v", v)
+			}
+		}
+		if crh, ok := headers["customResponseHeaders"].(map[string]interface{}); ok {
+			config.Headers.CustomResponseHeaders = make(map[string]string)
+			for k, v := range crh {
+				config.Headers.CustomResponseHeaders[k] = fmt.Sprintf("%v", v)
+			}
+		}
+		if sr, ok := headers["sslRedirect"].(bool); ok {
+			config.Headers.SSLRedirect = sr
+		}
+	}
+
+	if sp, ok := middlewareMap["stripPrefix"].(map[string]interface{}); ok {
+		config.StripPrefix = &StripPrefixConfig{}
+		if prefixes, ok := sp["prefixes"].([]interface{}); ok {
+			config.StripPrefix.Prefixes = make([]string, len(prefixes))
+			for i, p := range prefixes {
+				config.StripPrefix.Prefixes[i] = fmt.Sprintf("%v", p)
+			}
+		}
+		if fs, ok := sp["forceSlash"].(bool); ok {
+			config.StripPrefix.ForceSlash = fs
+		}
+	}
+
+	if ap, ok := middlewareMap["addPrefix"].(map[string]interface{}); ok {
+		config.AddPrefix = &AddPrefixConfig{}
+		if prefix, ok := ap["prefix"].(string); ok {
+			config.AddPrefix.Prefix = prefix
+		}
+	}
+
+	return config
 }
 
 // Helper functions for building Traefik config

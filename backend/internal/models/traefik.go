@@ -350,3 +350,62 @@ func (m *Middleware) ToResponse() MiddlewareResponse {
 		UpdatedAt: m.UpdatedAt,
 	}
 }
+
+// HTTPProvider represents an external Traefik HTTP Provider to aggregate
+type HTTPProvider struct {
+	ID              uint       `gorm:"primaryKey" json:"id"`
+	Name            string     `gorm:"uniqueIndex;not null" json:"name"`
+	URL             string     `gorm:"not null" json:"url"`
+	Priority        int        `gorm:"default:0;index" json:"priority"` // Higher = higher priority
+	IsActive        bool       `gorm:"default:true" json:"is_active"`
+	RefreshInterval int        `gorm:"default:30" json:"refresh_interval"` // seconds
+	LastFetched     *time.Time `json:"last_fetched"`
+	LastResponse    []byte     `gorm:"type:text" json:"-"`
+	LastError       string     `json:"last_error"`
+	RouterCount     int        `json:"router_count"`
+	ServiceCount    int        `json:"service_count"`
+	MiddlewareCount int        `json:"middleware_count"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+}
+
+// ToResponse converts HTTPProvider to a safe response
+func (e *HTTPProvider) ToResponse() map[string]interface{} {
+	lastFetched := ""
+	if e.LastFetched != nil {
+		lastFetched = e.LastFetched.Format(time.RFC3339)
+	}
+	return map[string]interface{}{
+		"id":               e.ID,
+		"name":             e.Name,
+		"url":              e.URL,
+		"priority":         e.Priority,
+		"is_active":        e.IsActive,
+		"refresh_interval": e.RefreshInterval,
+		"last_fetched":     lastFetched,
+		"last_error":       e.LastError,
+		"router_count":     e.RouterCount,
+		"service_count":    e.ServiceCount,
+		"middleware_count": e.MiddlewareCount,
+		"created_at":       e.CreatedAt.Format(time.RFC3339),
+		"updated_at":       e.UpdatedAt.Format(time.RFC3339),
+	}
+}
+
+// Request/Response structures for HTTPProvider API
+
+type CreateHTTPProviderRequest struct {
+	Name            string `json:"name" binding:"required"`
+	URL             string `json:"url" binding:"required,url"`
+	Priority        int    `json:"priority"`
+	RefreshInterval int    `json:"refresh_interval"`
+	IsActive        bool   `json:"is_active"`
+}
+
+type UpdateHTTPProviderRequest struct {
+	Name            *string `json:"name,omitempty"`
+	URL             *string `json:"url,omitempty" binding:"omitempty,url"`
+	Priority        *int    `json:"priority,omitempty"`
+	RefreshInterval *int    `json:"refresh_interval,omitempty"`
+	IsActive        *bool   `json:"is_active,omitempty"`
+}

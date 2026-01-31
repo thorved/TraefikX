@@ -3,7 +3,7 @@ import axios, {
   AxiosInstance,
   InternalAxiosRequestConfig,
 } from "axios";
-import { AuthResponse, User, ApiError, Service, Middleware, Router, CreateServiceRequest, UpdateServiceRequest, CreateMiddlewareRequest, UpdateMiddlewareRequest, CreateRouterRequest, UpdateRouterRequest, ProxyHost, CreateProxyHostRequest, UpdateProxyHostRequest } from "@/types";
+import { AuthResponse, User, ApiError, Service, Middleware, Router, CreateServiceRequest, UpdateServiceRequest, CreateMiddlewareRequest, UpdateMiddlewareRequest, CreateRouterRequest, UpdateRouterRequest, ProxyHost, CreateProxyHostRequest, UpdateProxyHostRequest, HTTPProvider, CreateHTTPProviderRequest, UpdateHTTPProviderRequest, MergedTraefikConfig } from "@/types";
 
 // Determine the base URL based on environment
 // During development with Next.js dev server: use relative URLs (proxied via rewrites)
@@ -231,6 +231,33 @@ export const proxyApi = {
     api.put<ProxyHost>(`/api/traefik/proxies/${id}`, data),
 
   deleteProxy: (id: number) => api.delete(`/api/traefik/proxies/${id}`),
+};
+
+// HTTP Providers API (for aggregating external Traefik HTTP providers)
+export const httpProvidersApi = {
+  listProviders: () =>
+    api.get<{ providers: HTTPProvider[] }>("/api/traefik/http-providers"),
+
+  getProvider: (id: number) =>
+    api.get<HTTPProvider>(`/api/traefik/http-providers/${id}`),
+
+  createProvider: (data: CreateHTTPProviderRequest) =>
+    api.post<HTTPProvider>("/api/traefik/http-providers", data),
+
+  updateProvider: (id: number, data: UpdateHTTPProviderRequest) =>
+    api.put<HTTPProvider>(`/api/traefik/http-providers/${id}`, data),
+
+  deleteProvider: (id: number) =>
+    api.delete(`/api/traefik/http-providers/${id}`),
+
+  refreshProvider: (id: number) =>
+    api.post(`/api/traefik/http-providers/${id}/refresh`),
+
+  testProvider: (id: number) =>
+    api.post<HTTPProvider>(`/api/traefik/http-providers/${id}/test`),
+
+  getMergedConfig: () =>
+    api.get<MergedTraefikConfig>("/api/traefik/merged-config"),
 };
 
 export default api;

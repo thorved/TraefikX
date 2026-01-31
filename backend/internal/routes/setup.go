@@ -9,10 +9,11 @@ import (
 	"github.com/traefikx/backend/internal/routes/static"
 	traefikRoutes "github.com/traefikx/backend/internal/routes/traefik"
 	"github.com/traefikx/backend/internal/routes/user"
+	"github.com/traefikx/backend/internal/services"
 	"gorm.io/gorm"
 )
 
-func SetupRouter(cfg *config.Config, db *gorm.DB) *gin.Engine {
+func SetupRouter(cfg *config.Config, db *gorm.DB, aggregator *services.AggregatorService) *gin.Engine {
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(db)
 	userHandler := handlers.NewUserHandler(db)
@@ -30,7 +31,7 @@ func SetupRouter(cfg *config.Config, db *gorm.DB) *gin.Engine {
 		user.RegisterRoutes(api, userHandler)
 
 		// Traefik routes
-		traefikRoutes.RegisterRoutes(api, cfg, db)
+		traefikRoutes.RegisterRoutes(api, cfg, db, aggregator)
 	}
 
 	// Static routes

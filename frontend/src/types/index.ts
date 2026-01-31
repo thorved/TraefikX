@@ -243,3 +243,67 @@ export interface DashboardStats {
   streams: number;
   offline_hosts: number;
 }
+
+// HTTP Provider Types
+export interface HTTPProvider {
+  id: number;
+  name: string;
+  url: string;
+  priority: number;
+  is_active: boolean;
+  refresh_interval: number;
+  last_fetched: string | null;
+  last_error: string | null;
+  router_count: number;
+  service_count: number;
+  middleware_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateHTTPProviderRequest {
+  name: string;
+  url: string;
+  priority: number;
+  refresh_interval: number;
+  is_active: boolean;
+}
+
+export interface UpdateHTTPProviderRequest {
+  name?: string;
+  url?: string;
+  priority?: number;
+  refresh_interval?: number;
+  is_active?: boolean;
+}
+
+export interface ConflictInfo {
+  type: "router" | "service" | "middleware";
+  name: string;
+  source: string;
+  overridden_by: string;
+  source_priority: number;
+}
+
+export interface ProviderSourceInfo {
+  name: string;
+  priority: number;
+  status: "healthy" | "degraded" | "unhealthy" | "inactive";
+  last_fetched?: string;
+  last_error?: string;
+  router_count: number;
+  service_count: number;
+  middleware_count: number;
+}
+
+export interface MergedTraefikConfig {
+  config: {
+    http: {
+      routers?: Record<string, unknown>;
+      services?: Record<string, unknown>;
+      middlewares?: Record<string, unknown>;
+    };
+  };
+  conflicts: ConflictInfo[];
+  sources: ProviderSourceInfo[];
+}

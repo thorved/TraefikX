@@ -5,16 +5,18 @@ import (
 	"github.com/traefikx/backend/internal/config"
 	"github.com/traefikx/backend/internal/handlers/traefik"
 	"github.com/traefikx/backend/internal/middleware"
+	"github.com/traefikx/backend/internal/services"
 	"gorm.io/gorm"
 )
 
-func RegisterRoutes(api *gin.RouterGroup, cfg *config.Config, db *gorm.DB) {
+func RegisterRoutes(api *gin.RouterGroup, cfg *config.Config, db *gorm.DB, aggregator *services.AggregatorService) {
 	// Initialize handlers
 	serviceHandler := traefik.NewServiceHandler(db)
 	routerHandler := traefik.NewRouterHandler(db)
 	middlewareHandler := traefik.NewMiddlewareHandler(db)
-	providerHandler := traefik.NewTraefikProviderHandler(db)
+	providerHandler := traefik.NewTraefikProviderHandler(db, aggregator)
 	proxyHandler := traefik.NewProxyHandler(db)
+	httpProviderHandler := traefik.NewHTTPProviderHandler(db, aggregator)
 
 	// Traefik management routes (protected)
 	traefikGroup := api.Group("/traefik")
@@ -47,6 +49,18 @@ func RegisterRoutes(api *gin.RouterGroup, cfg *config.Config, db *gorm.DB) {
 		traefikGroup.GET("/routers/:id", middleware.AdminMiddleware(), routerHandler.GetRouter)
 		traefikGroup.PUT("/routers/:id", middleware.AdminMiddleware(), routerHandler.UpdateRouter)
 		traefikGroup.DELETE("/routers/:id", middleware.AdminMiddleware(), routerHandler.DeleteRouter)
+
+		// HTTP Provider management (admin only)
+		traefikGroup.GET("/http-providers", middleware.AdminMiddleware(), httpProviderHandler.ListHTTPProviders)
+		traefikGroup.POST("/http-providers", middleware.AdminMiddleware(), httpProviderHandler.CreateHTTPProvider)
+		traefikGroup.GET("/http-providers/:id", middleware.AdminMiddleware(), httpProviderHandler.GetHTTPProvider)
+		traefikGroup.PUT("/http-providers/:id", middleware.AdminMiddleware(), httpProviderHandler.UpdateHTTPProvider)
+		traefikGroup.DELETE("/http-providers/:id", middleware.AdminMiddleware(), httpProviderHandler.DeleteHTTPProvider)
+		traefikGroup.POST("/http-providers/:id/refresh", middleware.AdminMiddleware(), httpProviderHandler.RefreshHTTPProvider)
+		traefikGroup.POST("/http-providers/:id/test", middleware.AdminMiddleware(), httpProviderHandler.TestHTTPProvider)
+
+		// Merged config viewer (admin only)
+		traefikGroup.GET("/merged-config", middleware.AdminMiddleware(), httpProviderHandler.GetMergedConfig)
 	}
 
 	// Traefik provider endpoint (public but token-protected)

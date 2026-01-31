@@ -8,6 +8,7 @@ import (
 	"github.com/traefikx/backend/internal/config"
 	"github.com/traefikx/backend/internal/database"
 	"github.com/traefikx/backend/internal/routes"
+	"github.com/traefikx/backend/internal/services"
 )
 
 func main() {
@@ -44,8 +45,12 @@ func main() {
 		}
 	}
 
+	// Initialize and start the Traefik endpoint aggregator service
+	aggregatorService := services.NewAggregatorService(db)
+	go aggregatorService.Start()
+
 	// Setup router
-	r := routes.SetupRouter(cfg, db)
+	r := routes.SetupRouter(cfg, db, aggregatorService)
 
 	// Start server
 	port := cfg.Port

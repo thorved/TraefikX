@@ -58,6 +58,7 @@ func Migrate() error {
 		&models.Service{},
 		&models.ServiceServer{},
 		&models.Middleware{},
+		&models.HTTPProvider{},
 	); err != nil {
 		return err
 	}

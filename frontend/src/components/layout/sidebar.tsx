@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { LayoutDashboard, Users, UserCircle, Shield, Menu, Globe } from "lucide-react";
+import { LayoutDashboard, Users, UserCircle, Shield, Menu, Globe, Server } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
@@ -11,8 +11,8 @@ import { cn } from "@/lib/utils";
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Proxy Hosts", href: "/proxies", icon: Globe },
+  { name: "HTTP Providers", href: "/http-providers", icon: Server, adminOnly: true },
   { name: "Users", href: "/users", icon: Users, adminOnly: true },
-  { name: "Profile", href: "/profile", icon: UserCircle },
 ];
 
 export function Sidebar() {
