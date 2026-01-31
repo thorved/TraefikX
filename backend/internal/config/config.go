@@ -42,6 +42,9 @@ type Config struct {
 	// Default Admin
 	DefaultAdminEmail    string
 	DefaultAdminPassword string
+
+	// Traefik HTTP Provider
+	TraefikProviderToken string // Token for /api/provider endpoint authentication
 }
 
 var AppConfig *Config
@@ -84,6 +87,9 @@ func Load() *Config {
 		// Default admin
 		DefaultAdminEmail:    getEnv("DEFAULT_ADMIN_EMAIL", "admin@traefikx.local"),
 		DefaultAdminPassword: getEnv("DEFAULT_ADMIN_PASSWORD", "changeme"),
+
+		// Traefik HTTP Provider
+		TraefikProviderToken: getEnv("TRAEFIK_PROVIDER_TOKEN", "change-me-in-production-traefik-token"),
 	}
 
 	// Validate JWT secret length

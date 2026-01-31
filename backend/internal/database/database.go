@@ -52,6 +52,12 @@ func Migrate() error {
 	if err := DB.AutoMigrate(
 		&models.User{},
 		&models.Session{},
+		&models.Router{},
+		&models.RouterHostname{},
+		&models.RouterMiddleware{},
+		&models.Service{},
+		&models.ServiceServer{},
+		&models.Middleware{},
 	); err != nil {
 		return err
 	}

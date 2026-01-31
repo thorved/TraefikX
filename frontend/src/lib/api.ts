@@ -3,7 +3,7 @@ import axios, {
   AxiosInstance,
   InternalAxiosRequestConfig,
 } from "axios";
-import { AuthResponse, User, ApiError } from "@/types";
+import { AuthResponse, User, ApiError, Service, Middleware, Router, CreateServiceRequest, UpdateServiceRequest, CreateMiddlewareRequest, UpdateMiddlewareRequest, CreateRouterRequest, UpdateRouterRequest, ProxyHost, CreateProxyHostRequest, UpdateProxyHostRequest } from "@/types";
 
 // Determine the base URL based on environment
 // During development with Next.js dev server: use relative URLs (proxied via rewrites)
@@ -165,6 +165,72 @@ export const usersApi = {
 
   toggleUserOIDC: (id: number, enabled: boolean) =>
     api.post(`/api/users/${id}/oidc/toggle`, { enabled }),
+};
+
+// Services API (under /traefik)
+export const servicesApi = {
+  listServices: () => api.get<{ services: Service[] }>("/api/traefik/services"),
+
+  getService: (id: number) => api.get<Service>(`/api/traefik/services/${id}`),
+
+  createService: (data: CreateServiceRequest) =>
+    api.post<Service>("/api/traefik/services", data),
+
+  updateService: (id: number, data: UpdateServiceRequest) =>
+    api.put<Service>(`/api/traefik/services/${id}`, data),
+
+  deleteService: (id: number) => api.delete(`/api/traefik/services/${id}`),
+};
+
+// Middlewares API (under /traefik)
+export const middlewaresApi = {
+  listMiddlewares: () => api.get<{ middlewares: Middleware[] }>("/api/traefik/middlewares"),
+
+  getMiddleware: (id: number) => api.get<Middleware>(`/api/traefik/middlewares/${id}`),
+
+  createMiddleware: (data: CreateMiddlewareRequest) =>
+    api.post<Middleware>("/api/traefik/middlewares", data),
+
+  updateMiddleware: (id: number, data: UpdateMiddlewareRequest) =>
+    api.put<Middleware>(`/api/traefik/middlewares/${id}`, data),
+
+  deleteMiddleware: (id: number) => api.delete(`/api/traefik/middlewares/${id}`),
+};
+
+// Routers API (under /traefik)
+export const routersApi = {
+  listRouters: () => api.get<{ routers: Router[] }>("/api/traefik/routers"),
+
+  getRouter: (id: number) => api.get<Router>(`/api/traefik/routers/${id}`),
+
+  createRouter: (data: CreateRouterRequest) =>
+    api.post<Router>("/api/traefik/routers", data),
+
+  updateRouter: (id: number, data: UpdateRouterRequest) =>
+    api.put<Router>(`/api/traefik/routers/${id}`, data),
+
+  deleteRouter: (id: number) => api.delete(`/api/traefik/routers/${id}`),
+};
+
+// Traefik Provider API (for viewing the generated config)
+export const providerApi = {
+  getConfig: (token: string) =>
+    api.get("/api/traefik/provider/config", { params: { token } }),
+};
+
+// Proxy Hosts API (NPM-style combined router + service)
+export const proxyApi = {
+  listProxies: () => api.get<{ proxies: ProxyHost[] }>("/api/traefik/proxies"),
+
+  getProxy: (id: number) => api.get<ProxyHost>(`/api/traefik/proxies/${id}`),
+
+  createProxy: (data: CreateProxyHostRequest) =>
+    api.post<ProxyHost>("/api/traefik/proxies", data),
+
+  updateProxy: (id: number, data: UpdateProxyHostRequest) =>
+    api.put<ProxyHost>(`/api/traefik/proxies/${id}`, data),
+
+  deleteProxy: (id: number) => api.delete(`/api/traefik/proxies/${id}`),
 };
 
 export default api;

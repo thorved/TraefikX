@@ -90,3 +90,25 @@ func CORSMiddleware(allowedOrigins []string) gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+// TraefikProviderTokenMiddleware validates the token for the Traefik provider endpoint
+func TraefikProviderTokenMiddleware(expectedToken string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Get token from query parameter
+		token := c.Query("token")
+
+		if token == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token parameter required"})
+			c.Abort()
+			return
+		}
+
+		if token != expectedToken {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
+}

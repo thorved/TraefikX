@@ -7,6 +7,7 @@ import (
 	"github.com/traefikx/backend/internal/middleware"
 	"github.com/traefikx/backend/internal/routes/auth"
 	"github.com/traefikx/backend/internal/routes/static"
+	traefikRoutes "github.com/traefikx/backend/internal/routes/traefik"
 	"github.com/traefikx/backend/internal/routes/user"
 	"gorm.io/gorm"
 )
@@ -27,6 +28,9 @@ func SetupRouter(cfg *config.Config, db *gorm.DB) *gin.Engine {
 	{
 		auth.RegisterRoutes(api, authHandler)
 		user.RegisterRoutes(api, userHandler)
+
+		// Traefik routes
+		traefikRoutes.RegisterRoutes(api, cfg, db)
 	}
 
 	// Static routes
