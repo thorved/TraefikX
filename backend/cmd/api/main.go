@@ -97,21 +97,39 @@ func main() {
 	// Serve frontend static files
 	staticPath := getStaticPath()
 	if staticPath != "" {
+		log.Printf("Serving static files from: %s", staticPath)
 		// Check if static directory exists
 		if _, err := os.Stat(staticPath); !os.IsNotExist(err) {
-			// Serve static files
-			r.Static("/assets", filepath.Join(staticPath, "assets"))
+			// Serve Next.js static files
+			r.Static("/_next", filepath.Join(staticPath, "_next"))
 			r.StaticFile("/favicon.ico", filepath.Join(staticPath, "favicon.ico"))
 
-			// Serve index.html for all non-API routes (SPA fallback)
+			// Serve page directories (login, dashboard, etc.)
+			r.Static("/login", filepath.Join(staticPath, "login"))
+			r.Static("/dashboard", filepath.Join(staticPath, "dashboard"))
+			r.Static("/users", filepath.Join(staticPath, "users"))
+			r.Static("/profile", filepath.Join(staticPath, "profile"))
+			r.Static("/auth", filepath.Join(staticPath, "auth"))
+
+			// Serve index.html for root path
+			r.GET("/", func(c *gin.Context) {
+				c.File(filepath.Join(staticPath, "index.html"))
+			})
+
+			// Serve index.html for all non-API, non-static routes (SPA fallback)
 			r.NoRoute(func(c *gin.Context) {
-				if !strings.HasPrefix(c.Request.URL.Path, "/api/") {
+				path := c.Request.URL.Path
+				if !strings.HasPrefix(path, "/api/") && !strings.HasPrefix(path, "/_next/") {
 					c.File(filepath.Join(staticPath, "index.html"))
 				} else {
 					c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
 				}
 			})
+		} else {
+			log.Printf("Warning: Static path not found: %s", staticPath)
 		}
+	} else {
+		log.Println("Warning: No static files path configured")
 	}
 
 	// Start server
@@ -127,7 +145,8 @@ func main() {
 }
 
 func getStaticPath() string {
-	// Try multiple possible locations for the frontend build
+	// Try multiple possible locations for the Next.js frontend build
+	// Next.js with output: 'export' creates an 'out' directory
 	possiblePaths := []string{
 		// Same directory as binary (production)
 		func() string {
@@ -135,14 +154,14 @@ func getStaticPath() string {
 			if err != nil {
 				return ""
 			}
-			return filepath.Join(filepath.Dir(execPath), "frontend", "dist")
+			return filepath.Join(filepath.Dir(execPath), "frontend", "out")
 		}(),
 		// Parent directory of backend (development from backend/)
-		"../frontend/dist",
+		"../frontend/out",
 		// Current working directory
-		"./frontend/dist",
+		"./frontend/out",
 		// Absolute path from project root
-		"./../frontend/dist",
+		"./../frontend/out",
 	}
 
 	for _, path := range possiblePaths {

@@ -72,8 +72,8 @@ func Load() *Config {
 		OIDCRedirectURL:  getEnv("OIDC_REDIRECT_URL", ""),
 		OIDCScopes:       getEnvAsSlice("OIDC_SCOPES", []string{"openid", "profile", "email"}),
 
-		// CORS defaults
-		CORSAllowedOrigins: getEnvAsSlice("CORS_ALLOWED_ORIGINS", []string{"http://localhost:5173", "http://localhost:8080"}),
+		// CORS defaults - includes Next.js dev server (3000) and production
+		CORSAllowedOrigins: getEnvAsSlice("CORS_ALLOWED_ORIGINS", []string{"http://localhost:3000", "http://localhost:8080"}),
 
 		// Default admin
 		DefaultAdminEmail:    getEnv("DEFAULT_ADMIN_EMAIL", "admin@traefikx.local"),
