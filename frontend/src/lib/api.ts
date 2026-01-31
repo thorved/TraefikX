@@ -6,18 +6,18 @@ import axios, {
 import { AuthResponse, User, ApiError, Service, Middleware, Router, CreateServiceRequest, UpdateServiceRequest, CreateMiddlewareRequest, UpdateMiddlewareRequest, CreateRouterRequest, UpdateRouterRequest, ProxyHost, CreateProxyHostRequest, UpdateProxyHostRequest, HTTPProvider, CreateHTTPProviderRequest, UpdateHTTPProviderRequest, MergedTraefikConfig } from "@/types";
 
 // Determine the base URL based on environment
-// During development with Next.js dev server: use relative URLs (proxied via rewrites)
-// For static export/production: use full backend URL
+// Development: use full URL to backend on port 8080
+// Production (static export): use relative URLs (same origin)
+// This works because the Go backend serves both frontend and API on the same port
 const getBaseURL = () => {
-  // In browser, check if we're running from static export
-  if (typeof window !== "undefined") {
-    // If running from file:// protocol or without Next.js dev server
-    // we need to use the full backend URL
-    const isStaticExport =
-      process.env.NEXT_PUBLIC_API_URL ||
-      (window.location.protocol === "file:" ? "http://localhost:8080" : "");
-    return isStaticExport;
+  // Check if we're in development mode
+  // NEXT_PUBLIC_DEV_API_URL is set during development to point to backend
+  if (process.env.NEXT_PUBLIC_DEV_API_URL) {
+    return process.env.NEXT_PUBLIC_DEV_API_URL;
   }
+  
+  // In production (static export), use relative URLs
+  // This automatically uses the current host:port serving the frontend
   return "";
 };
 

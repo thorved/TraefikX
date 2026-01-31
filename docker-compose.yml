@@ -7,23 +7,8 @@ services:
       - "8080:8080"
     volumes:
       - ./data:/app/data
-      - ./backend/.env:/app/.env:ro
     environment:
       - ENV=production
     restart: unless-stopped
-
-  # Optional: For development with hot reload
-  traefikx-dev:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile.dev
-    ports:
-      - "8080:8080"
-    volumes:
-      - ./backend:/app
-      - ./data:/app/data
-    environment:
-      - ENV=development
-    profiles:
-      - dev
-    restart: unless-stopped
+    env_file:
+      - /backend/.env
