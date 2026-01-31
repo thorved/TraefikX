@@ -32,6 +32,9 @@ type Config struct {
 	OIDCClientSecret string
 	OIDCRedirectURL  string
 	OIDCScopes       []string
+	OIDCAuthURL      string
+	OIDCTokenURL     string
+	OIDCUserInfoURL  string
 
 	// CORS
 	CORSAllowedOrigins []string
@@ -71,6 +74,9 @@ func Load() *Config {
 		OIDCClientSecret: getEnv("OIDC_CLIENT_SECRET", ""),
 		OIDCRedirectURL:  getEnv("OIDC_REDIRECT_URL", ""),
 		OIDCScopes:       getEnvAsSlice("OIDC_SCOPES", []string{"openid", "profile", "email"}),
+		OIDCAuthURL:      getEnv("OIDC_AUTH_URL", ""),
+		OIDCTokenURL:     getEnv("OIDC_TOKEN_URL", ""),
+		OIDCUserInfoURL:  getEnv("OIDC_USER_INFO_URL", ""),
 
 		// CORS defaults - includes Next.js dev server (3000) and production
 		CORSAllowedOrigins: getEnvAsSlice("CORS_ALLOWED_ORIGINS", []string{"http://localhost:3000", "http://localhost:8080"}),

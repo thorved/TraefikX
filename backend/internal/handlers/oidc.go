@@ -1,9 +1,9 @@
 package handlers
 
 import (
-	"encoding/json"
-	"io"
+	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -58,9 +58,15 @@ func (h *AuthHandler) OIDCCallback(c *gin.Context) {
 	}
 
 	// Get user info from OIDC provider
-	userInfo, err := fetchOIDCUserInfo(token.AccessToken)
+	userInfo, err := auth.GetOIDCUserInfo(token)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Failed to get user info: " + err.Error()})
+		return
+	}
+
+	if userInfo.Email == "" {
+		log.Printf("Error: OIDC provider returned empty email. Subject: %s", userInfo.Subject)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "OIDC provider did not return an email address"})
 		return
 	}
 
@@ -70,37 +76,48 @@ func (h *AuthHandler) OIDCCallback(c *gin.Context) {
 		return
 	}
 
+	log.Printf("OIDC Callback: Subject=%s, Email=%s", userInfo.Subject, userInfo.Email)
+
 	// Find or create user
 	var user models.User
 	result := h.db.Where("oidc_subject = ? AND oidc_provider = ?", userInfo.Subject, config.AppConfig.OIDCProviderName).First(&user)
 
 	if result.Error != nil {
+		log.Printf("OIDC user not found by subject. Searching by email: %s", userInfo.Email)
+
 		// User doesn't exist, check if there's a user with same email
-		h.db.Where("email = ?", userInfo.Email).First(&user)
+		// Use lowercase comparison to ensure we match regardless of casing
+		emailResult := h.db.Where("lower(email) = ?", strings.ToLower(userInfo.Email)).First(&user)
+		log.Printf("Email search result: ID=%d, Email=%s, Error=%v", user.ID, user.Email, emailResult.Error)
 
 		if user.ID == 0 {
-			// Create new user
-			user = models.User{
-				Email:           userInfo.Email,
-				Role:            models.RoleUser, // Default role for OIDC users
-				IsActive:        true,
-				OIDCProvider:    config.AppConfig.OIDCProviderName,
-				OIDCSubject:     userInfo.Subject,
-				OIDCEnabled:     true,
-				PasswordEnabled: false, // OIDC users don't have password initially
-			}
+			// User does not exist and auto-creation is disabled
+			log.Printf("OIDC login failed: No user found with email %s", userInfo.Email)
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error":   "Account not found",
+				"details": "No account exists with this email address. Please contact an administrator.",
+			})
+			return
 		} else {
 			// Link existing user with OIDC (email matches)
+			log.Printf("Linking existing user ID=%d with OIDC", user.ID)
+
 			user.OIDCProvider = config.AppConfig.OIDCProviderName
 			user.OIDCSubject = userInfo.Subject
 			user.OIDCEnabled = true
 			now := time.Now()
 			user.OIDCLinkedAt = &now
-		}
 
-		if err := h.db.Create(&user).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
-			return
+			// Ensure email is set (in case DB record was weird)
+			if user.Email == "" {
+				user.Email = userInfo.Email
+			}
+
+			if err := h.db.Save(&user).Error; err != nil {
+				log.Printf("Failed to link user: %v", err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to link user", "details": err.Error()})
+				return
+			}
 		}
 	} else {
 		// Update existing OIDC user
@@ -240,39 +257,4 @@ func (h *AuthHandler) handleOIDCLink(c *gin.Context, userID uint, userInfo *auth
 		"message": "OIDC account linked successfully",
 		"user":    user.ToResponse(),
 	})
-}
-
-// fetchOIDCUserInfo fetches user info from OIDC provider
-func fetchOIDCUserInfo(accessToken string) (*auth.OIDCUserInfo, error) {
-	cfg := config.AppConfig
-
-	client := &http.Client{Timeout: 10 * time.Second}
-	req, err := http.NewRequest("GET", cfg.OIDCIssuerURL+"/oidc/userinfo", nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, err
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	var userInfo auth.OIDCUserInfo
-	if err := json.Unmarshal(body, &userInfo); err != nil {
-		return nil, err
-	}
-
-	return &userInfo, nil
 }

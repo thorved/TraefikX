@@ -125,6 +125,11 @@ export const authApi = {
     api.post<{ auth_url: string; state: string }>("/api/auth/oidc/link"),
 
   unlinkOIDC: () => api.delete("/api/auth/oidc/link"),
+
+  oidcCallback: (code: string, state: string) =>
+    api.get<AuthResponse>("/api/auth/oidc/callback", {
+      params: { code, state },
+    }),
 };
 
 // Users API

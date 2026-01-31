@@ -4,8 +4,10 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -34,14 +36,25 @@ func InitOIDC(cfg *config.Config) error {
 		return errors.New("OIDC configuration incomplete: issuer URL, client ID, and client secret are required")
 	}
 
+	// Use configured endpoints or fall back to issuer-based discovery (simplified for now to require config)
+	authURL := cfg.OIDCAuthURL
+	if authURL == "" {
+		authURL = cfg.OIDCIssuerURL + "/oauth/authorize"
+	}
+
+	tokenURL := cfg.OIDCTokenURL
+	if tokenURL == "" {
+		tokenURL = cfg.OIDCIssuerURL + "/oauth/token"
+	}
+
 	oauthConfig = &oauth2.Config{
 		ClientID:     cfg.OIDCClientID,
 		ClientSecret: cfg.OIDCClientSecret,
 		RedirectURL:  cfg.OIDCRedirectURL,
 		Scopes:       cfg.OIDCScopes,
 		Endpoint: oauth2.Endpoint{
-			AuthURL:  cfg.OIDCIssuerURL + "/oauth/authorize",
-			TokenURL: cfg.OIDCIssuerURL + "/oauth/token",
+			AuthURL:  authURL,
+			TokenURL: tokenURL,
 		},
 	}
 
@@ -116,8 +129,14 @@ func GetOIDCUserInfo(token *oauth2.Token) (*OIDCUserInfo, error) {
 	cfg := config.AppConfig
 
 	// Fetch user info from userinfo endpoint
+	// Fetch user info from userinfo endpoint
+	userInfoURL := cfg.OIDCUserInfoURL
+	if userInfoURL == "" {
+		userInfoURL = cfg.OIDCIssuerURL + "/oidc/userinfo"
+	}
+
 	client := oauthConfig.Client(context.Background(), token)
-	resp, err := client.Get(cfg.OIDCIssuerURL + "/oidc/userinfo")
+	resp, err := client.Get(userInfoURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user info: %w", err)
 	}
@@ -127,10 +146,16 @@ func GetOIDCUserInfo(token *oauth2.Token) (*OIDCUserInfo, error) {
 		return nil, fmt.Errorf("userinfo endpoint returned status %d", resp.StatusCode)
 	}
 
-	// Parse user info (simplified - adjust based on Pocket ID response format)
+	// Parse user info
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
 	var userInfo OIDCUserInfo
-	// In a real implementation, you'd decode JSON here
-	// For now, we'll use a placeholder approach
+	if err := json.Unmarshal(body, &userInfo); err != nil {
+		return nil, fmt.Errorf("failed to parse user info: %w", err)
+	}
 
 	return &userInfo, nil
 }

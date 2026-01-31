@@ -46,9 +46,36 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 		return
 	}
 
-	// Check if email already exists
+	// Check if email already exists (including soft-deleted)
 	var existingUser models.User
-	if err := h.db.Where("email = ?", req.Email).First(&existingUser).Error; err == nil {
+	if err := h.db.Unscoped().Where("email = ?", req.Email).First(&existingUser).Error; err == nil {
+		if existingUser.DeletedAt.Valid {
+			// User exists but is soft-deleted. Restore it.
+			existingUser.DeletedAt = gorm.DeletedAt{}
+			existingUser.IsActive = true
+			existingUser.Role = req.Role
+			existingUser.PasswordEnabled = req.Password != ""
+			existingUser.OIDCEnabled = req.OIDCEnabled
+
+			// Update password if provided
+			if req.Password != "" {
+				hashedPassword, err := database.HashPassword(req.Password)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+					return
+				}
+				existingUser.Password = hashedPassword
+			}
+
+			if err := h.db.Save(&existingUser).Error; err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to restore user"})
+				return
+			}
+
+			c.JSON(http.StatusOK, existingUser.ToResponse())
+			return
+		}
+
 		c.JSON(http.StatusConflict, gin.H{"error": "User with this email already exists"})
 		return
 	}
