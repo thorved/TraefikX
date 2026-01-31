@@ -1,0 +1,14 @@
+{
+  "recommendations": [
+    "golang.Go",
+    "bradlc.vscode-tailwindcss",
+    "vue.volar",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "ms-vscode.vscode-typescript-next",
+    "antfu.unocss",
+    "formulahendry.auto-close-tag",
+    "formulahendry.auto-rename-tag",
+    "ms-azuretools.vscode-docker"
+  ]
+}
