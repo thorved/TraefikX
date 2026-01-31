@@ -1,36 +1,36 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { useAuth } from '@/contexts/AuthContext';
-import { authApi } from '@/lib/api';
-import { Button } from '@/components/ui/button';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useAuth } from "@/contexts/AuthContext";
+import { authApi } from "@/lib/api";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Shield, KeyRound, Github } from 'lucide-react';
-import { toast } from 'sonner';
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Shield, KeyRound, Github } from "lucide-react";
+import { toast } from "sonner";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [oidcEnabled, setOidcEnabled] = useState(false);
-  const [oidcProvider, setOidcProvider] = useState('');
+  const [oidcProvider, setOidcProvider] = useState("");
   const { login, isAuthenticated } = useAuth();
   const router = useRouter();
 
   // Check if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      router.push('/dashboard');
+      router.push("/dashboard");
     }
   }, [isAuthenticated, router]);
 
@@ -41,10 +41,10 @@ export default function LoginPage() {
         const response = await authApi.getOIDCStatus();
         setOidcEnabled(response.data.enabled);
         if (response.data.enabled) {
-          setOidcProvider(response.data.provider_name || 'OIDC');
+          setOidcProvider(response.data.provider_name || "OIDC");
         }
       } catch (error) {
-        console.error('Failed to check OIDC status:', error);
+        console.error("Failed to check OIDC status:", error);
       }
     };
     checkOIDC();
@@ -56,10 +56,10 @@ export default function LoginPage() {
 
     try {
       await login(email, password);
-      toast.success('Login successful!');
-      router.push('/dashboard');
+      toast.success("Login successful!");
+      router.push("/dashboard");
     } catch (error: any) {
-      const message = error.response?.data?.error || 'Login failed';
+      const message = error.response?.data?.error || "Login failed";
       toast.error(message);
     } finally {
       setIsLoading(false);
@@ -73,7 +73,8 @@ export default function LoginPage() {
       // Redirect to OIDC provider
       window.location.href = response.data.auth_url;
     } catch (error: any) {
-      const message = error.response?.data?.error || 'Failed to initiate OIDC login';
+      const message =
+        error.response?.data?.error || "Failed to initiate OIDC login";
       toast.error(message);
       setIsLoading(false);
     }
@@ -117,13 +118,9 @@ export default function LoginPage() {
                 required
               />
             </div>
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={isLoading}
-            >
+            <Button type="submit" className="w-full" disabled={isLoading}>
               <KeyRound className="mr-2 h-4 w-4" />
-              {isLoading ? 'Signing in...' : 'Sign in with Password'}
+              {isLoading ? "Signing in..." : "Sign in with Password"}
             </Button>
           </form>
 
@@ -134,7 +131,9 @@ export default function LoginPage() {
                   <span className="w-full border-t" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+                  <span className="bg-card px-2 text-muted-foreground">
+                    Or continue with
+                  </span>
                 </div>
               </div>
 

@@ -1,18 +1,18 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { ProtectedLayout } from '@/components/layout/protected-layout';
-import { useUsers } from '@/hooks/use-users';
-import { usersApi } from '@/lib/api';
-import { User, UserRole } from '@/types';
-import { Button } from '@/components/ui/button';
+import { useState } from "react";
+import { ProtectedLayout } from "@/components/layout/protected-layout";
+import { useUsers } from "@/hooks/use-users";
+import { usersApi } from "@/lib/api";
+import { User, UserRole } from "@/types";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
+} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -21,23 +21,23 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -45,9 +45,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   MoreHorizontal,
   Plus,
@@ -55,23 +55,25 @@ import {
   Trash2,
   Lock,
   Mail,
-} from 'lucide-react';
-import { toast } from 'sonner';
+} from "lucide-react";
+import { toast } from "sonner";
 
 export default function UsersPage() {
-  const { users, isLoading, refetch, createUser, updateUser, deleteUser } = useUsers();
+  const { users, isLoading, refetch, createUser, updateUser, deleteUser } =
+    useUsers();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isResetPasswordDialogOpen, setIsResetPasswordDialogOpen] = useState(false);
+  const [isResetPasswordDialogOpen, setIsResetPasswordDialogOpen] =
+    useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [newPassword, setNewPassword] = useState('');
+  const [newPassword, setNewPassword] = useState("");
 
   // Form states
   const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    role: 'user' as UserRole,
+    email: "",
+    password: "",
+    role: "user" as UserRole,
     oidc_enabled: false,
   });
 
@@ -79,11 +81,16 @@ export default function UsersPage() {
     e.preventDefault();
     try {
       await createUser(formData);
-      toast.success('User created successfully');
+      toast.success("User created successfully");
       setIsCreateDialogOpen(false);
-      setFormData({ email: '', password: '', role: 'user', oidc_enabled: false });
+      setFormData({
+        email: "",
+        password: "",
+        role: "user",
+        oidc_enabled: false,
+      });
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to create user');
+      toast.error(error.response?.data?.error || "Failed to create user");
     }
   };
 
@@ -97,10 +104,10 @@ export default function UsersPage() {
         role: formData.role,
         oidc_enabled: formData.oidc_enabled,
       });
-      toast.success('User updated successfully');
+      toast.success("User updated successfully");
       setIsEditDialogOpen(false);
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to update user');
+      toast.error(error.response?.data?.error || "Failed to update user");
     }
   };
 
@@ -109,10 +116,10 @@ export default function UsersPage() {
 
     try {
       await deleteUser(selectedUser.id);
-      toast.success('User deleted successfully');
+      toast.success("User deleted successfully");
       setIsDeleteDialogOpen(false);
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to delete user');
+      toast.error(error.response?.data?.error || "Failed to delete user");
     }
   };
 
@@ -122,11 +129,11 @@ export default function UsersPage() {
 
     try {
       await usersApi.resetPassword(selectedUser.id, newPassword);
-      toast.success('Password reset successfully');
+      toast.success("Password reset successfully");
       setIsResetPasswordDialogOpen(false);
-      setNewPassword('');
+      setNewPassword("");
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to reset password');
+      toast.error(error.response?.data?.error || "Failed to reset password");
     }
   };
 
@@ -134,7 +141,7 @@ export default function UsersPage() {
     setSelectedUser(user);
     setFormData({
       email: user.email,
-      password: '',
+      password: "",
       role: user.role,
       oidc_enabled: user.oidc_enabled,
     });
@@ -153,9 +160,9 @@ export default function UsersPage() {
 
   const getRoleBadge = (role: UserRole) => {
     switch (role) {
-      case 'admin':
+      case "admin":
         return <Badge variant="default">Admin</Badge>;
-      case 'user':
+      case "user":
         return <Badge variant="secondary">User</Badge>;
       default:
         return <Badge variant="outline">{role}</Badge>;
@@ -168,9 +175,14 @@ export default function UsersPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Users</h1>
-            <p className="text-muted-foreground">Manage user accounts and permissions</p>
+            <p className="text-muted-foreground">
+              Manage user accounts and permissions
+            </p>
           </div>
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <Dialog
+            open={isCreateDialogOpen}
+            onOpenChange={setIsCreateDialogOpen}
+          >
             <DialogTrigger asChild>
               <Button>
                 <Plus className="mr-2 h-4 w-4" />
@@ -181,7 +193,8 @@ export default function UsersPage() {
               <DialogHeader>
                 <DialogTitle>Create New User</DialogTitle>
                 <DialogDescription>
-                  Add a new user to the system. They will receive access credentials.
+                  Add a new user to the system. They will receive access
+                  credentials.
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleCreateSubmit}>
@@ -192,7 +205,9 @@ export default function UsersPage() {
                       id="email"
                       type="email"
                       value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, email: e.target.value })
+                      }
                       required
                     />
                   </div>
@@ -202,7 +217,9 @@ export default function UsersPage() {
                       id="password"
                       type="password"
                       value={formData.password}
-                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, password: e.target.value })
+                      }
                       placeholder="Leave empty for OIDC-only"
                     />
                   </div>
@@ -210,7 +227,9 @@ export default function UsersPage() {
                     <Label htmlFor="role">Role</Label>
                     <Select
                       value={formData.role}
-                      onValueChange={(value) => setFormData({ ...formData, role: value as UserRole })}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, role: value as UserRole })
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -225,7 +244,9 @@ export default function UsersPage() {
                     <Switch
                       id="oidc"
                       checked={formData.oidc_enabled}
-                      onCheckedChange={(checked) => setFormData({ ...formData, oidc_enabled: checked })}
+                      onCheckedChange={(checked) =>
+                        setFormData({ ...formData, oidc_enabled: checked })
+                      }
                     />
                     <Label htmlFor="oidc">Enable OIDC login</Label>
                   </div>
@@ -241,7 +262,9 @@ export default function UsersPage() {
         <Card>
           <CardHeader>
             <CardTitle>All Users</CardTitle>
-            <CardDescription>{users.length} total users in the system</CardDescription>
+            <CardDescription>
+              {users.length} total users in the system
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -264,22 +287,32 @@ export default function UsersPage() {
                 <TableBody>
                   {users.map((user) => (
                     <TableRow key={user.id}>
-                      <TableCell className="font-medium">{user.email}</TableCell>
+                      <TableCell className="font-medium">
+                        {user.email}
+                      </TableCell>
                       <TableCell>{getRoleBadge(user.role)}</TableCell>
                       <TableCell>
                         {user.is_active ? (
-                          <Badge variant="outline" className="text-green-600">Active</Badge>
+                          <Badge variant="outline" className="text-green-600">
+                            Active
+                          </Badge>
                         ) : (
-                          <Badge variant="outline" className="text-red-600">Inactive</Badge>
+                          <Badge variant="outline" className="text-red-600">
+                            Inactive
+                          </Badge>
                         )}
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
                           {user.password_enabled && (
-                            <Badge variant="outline" className="text-xs">Password</Badge>
+                            <Badge variant="outline" className="text-xs">
+                              Password
+                            </Badge>
                           )}
                           {user.oidc_enabled && (
-                            <Badge variant="outline" className="text-xs">OIDC</Badge>
+                            <Badge variant="outline" className="text-xs">
+                              OIDC
+                            </Badge>
                           )}
                         </div>
                       </TableCell>
@@ -291,11 +324,15 @@ export default function UsersPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openEditDialog(user)}>
+                            <DropdownMenuItem
+                              onClick={() => openEditDialog(user)}
+                            >
                               <UserCog className="mr-2 h-4 w-4" />
                               Edit
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => openResetPasswordDialog(user)}>
+                            <DropdownMenuItem
+                              onClick={() => openResetPasswordDialog(user)}
+                            >
                               <Lock className="mr-2 h-4 w-4" />
                               Reset Password
                             </DropdownMenuItem>
@@ -322,7 +359,9 @@ export default function UsersPage() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Edit User</DialogTitle>
-              <DialogDescription>Update user details and permissions.</DialogDescription>
+              <DialogDescription>
+                Update user details and permissions.
+              </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleEditSubmit}>
               <div className="space-y-4 py-4">
@@ -332,7 +371,9 @@ export default function UsersPage() {
                     id="edit-email"
                     type="email"
                     value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, email: e.target.value })
+                    }
                     required
                   />
                 </div>
@@ -340,7 +381,9 @@ export default function UsersPage() {
                   <Label htmlFor="edit-role">Role</Label>
                   <Select
                     value={formData.role}
-                    onValueChange={(value) => setFormData({ ...formData, role: value as UserRole })}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, role: value as UserRole })
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -355,7 +398,9 @@ export default function UsersPage() {
                   <Switch
                     id="edit-oidc"
                     checked={formData.oidc_enabled}
-                    onCheckedChange={(checked) => setFormData({ ...formData, oidc_enabled: checked })}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, oidc_enabled: checked })
+                    }
                   />
                   <Label htmlFor="edit-oidc">Enable OIDC login</Label>
                 </div>
@@ -373,18 +418,29 @@ export default function UsersPage() {
             <DialogHeader>
               <DialogTitle>Delete User</DialogTitle>
               <DialogDescription>
-                Are you sure you want to delete {selectedUser?.email}? This action cannot be undone.
+                Are you sure you want to delete {selectedUser?.email}? This
+                action cannot be undone.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Cancel</Button>
-              <Button variant="destructive" onClick={handleDelete}>Delete</Button>
+              <Button
+                variant="outline"
+                onClick={() => setIsDeleteDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleDelete}>
+                Delete
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
         {/* Reset Password Dialog */}
-        <Dialog open={isResetPasswordDialogOpen} onOpenChange={setIsResetPasswordDialogOpen}>
+        <Dialog
+          open={isResetPasswordDialogOpen}
+          onOpenChange={setIsResetPasswordDialogOpen}
+        >
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Reset Password</DialogTitle>
@@ -405,7 +461,8 @@ export default function UsersPage() {
                     minLength={12}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Must be at least 12 characters with uppercase, lowercase, number, and special character.
+                    Must be at least 12 characters with uppercase, lowercase,
+                    number, and special character.
                   </p>
                 </div>
               </div>

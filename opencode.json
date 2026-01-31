@@ -1,0 +1,44 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    "AGENTS.md",
+    "backend/AGENTS.md",
+    "frontend/AGENTS.md"
+  ],
+  "command": {
+    "dev-backend": {
+      "description": "Start backend dev server",
+      "template": "Run the Go backend development server on port 8080 using: cd backend && go run cmd/api/main.go"
+    },
+    "dev-frontend": {
+      "description": "Start frontend dev server", 
+      "template": "Run the Next.js frontend development server on port 3000 using: cd frontend && npm run dev"
+    },
+    "test-backend": {
+      "description": "Run Go tests",
+      "template": "Run all Go tests with: cd backend && go test ./..."
+    },
+    "lint-frontend": {
+      "description": "Lint frontend code",
+      "template": "Run Biome linter on frontend code with: cd frontend && npm run lint"
+    },
+    "format-frontend": {
+      "description": "Format frontend code",
+      "template": "Format frontend code with Biome using: cd frontend && npm run format"
+    },
+    "docker-up": {
+      "description": "Start Docker containers",
+      "template": "Start all Docker containers with: docker-compose up -d"
+    }
+  },
+  "formatter": {
+    "go": {
+      "command": ["go", "fmt", "$FILE"],
+      "extensions": [".go"]
+    },
+    "biome": {
+      "command": ["npx", "biome", "format", "--write", "$FILE"],
+      "extensions": [".ts", ".tsx", ".js", ".jsx", ".json", ".css"]
+    }
+  }
+}

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { usersApi } from '@/lib/api';
-import { User } from '@/types';
+import { useState, useEffect } from "react";
+import { usersApi } from "@/lib/api";
+import { User } from "@/types";
 
 export function useUsers() {
   const [users, setUsers] = useState<User[]>([]);
@@ -14,7 +14,7 @@ export function useUsers() {
       const response = await usersApi.listUsers();
       setUsers(response.data.users);
     } catch (err) {
-      setError('Failed to fetch users');
+      setError("Failed to fetch users");
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -24,7 +24,7 @@ export function useUsers() {
   const createUser = async (data: {
     email: string;
     password?: string;
-    role: 'admin' | 'user';
+    role: "admin" | "user";
     oidc_enabled: boolean;
   }) => {
     const response = await usersApi.createUser(data);
@@ -36,10 +36,10 @@ export function useUsers() {
     id: number,
     data: {
       email?: string;
-      role?: 'admin' | 'user';
+      role?: "admin" | "user";
       is_active?: boolean;
       oidc_enabled?: boolean;
-    }
+    },
   ) => {
     const response = await usersApi.updateUser(id, data);
     setUsers(users.map((u) => (u.id === id ? response.data : u)));

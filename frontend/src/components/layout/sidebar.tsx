@@ -1,23 +1,17 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
-import {
-  LayoutDashboard,
-  Users,
-  UserCircle,
-  Shield,
-  Menu,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { cn } from '@/lib/utils';
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
+import { LayoutDashboard, Users, UserCircle, Shield, Menu } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { cn } from "@/lib/utils";
 
 const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Users', href: '/users', icon: Users, adminOnly: true },
-  { name: 'Profile', href: '/profile', icon: UserCircle },
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Users", href: "/users", icon: Users, adminOnly: true },
+  { name: "Profile", href: "/profile", icon: UserCircle },
 ];
 
 export function Sidebar() {
@@ -25,9 +19,7 @@ export function Sidebar() {
   const { checkAdmin } = useAuth();
   const isAdmin = checkAdmin();
 
-  const navItems = navigation.filter(
-    (item) => !item.adminOnly || isAdmin
-  );
+  const navItems = navigation.filter((item) => !item.adminOnly || isAdmin);
 
   return (
     <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
@@ -41,22 +33,26 @@ export function Sidebar() {
             <li>
               <ul role="list" className="-mx-2 space-y-1">
                 {navItems.map((item) => {
-                  const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+                  const isActive =
+                    pathname === item.href ||
+                    pathname.startsWith(`${item.href}/`);
                   return (
                     <li key={item.name}>
                       <Link
                         href={item.href}
                         className={cn(
-                          'group flex gap-x-3 rounded-md p-2 text-sm font-semibold leading-6',
+                          "group flex gap-x-3 rounded-md p-2 text-sm font-semibold leading-6",
                           isActive
-                            ? 'bg-primary text-primary-foreground'
-                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                         )}
                       >
                         <item.icon
                           className={cn(
-                            'h-6 w-6 shrink-0',
-                            isActive ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-accent-foreground'
+                            "h-6 w-6 shrink-0",
+                            isActive
+                              ? "text-primary-foreground"
+                              : "text-muted-foreground group-hover:text-accent-foreground",
                           )}
                           aria-hidden="true"
                         />
@@ -79,9 +75,7 @@ export function MobileSidebar() {
   const { checkAdmin } = useAuth();
   const isAdmin = checkAdmin();
 
-  const navItems = navigation.filter(
-    (item) => !item.adminOnly || isAdmin
-  );
+  const navItems = navigation.filter((item) => !item.adminOnly || isAdmin);
 
   return (
     <Sheet>
@@ -101,22 +95,26 @@ export function MobileSidebar() {
             <li>
               <ul role="list" className="-mx-2 space-y-1">
                 {navItems.map((item) => {
-                  const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+                  const isActive =
+                    pathname === item.href ||
+                    pathname.startsWith(`${item.href}/`);
                   return (
                     <li key={item.name}>
                       <Link
                         href={item.href}
                         className={cn(
-                          'group flex gap-x-3 rounded-md p-2 text-sm font-semibold leading-6',
+                          "group flex gap-x-3 rounded-md p-2 text-sm font-semibold leading-6",
                           isActive
-                            ? 'bg-primary text-primary-foreground'
-                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                         )}
                       >
                         <item.icon
                           className={cn(
-                            'h-6 w-6 shrink-0',
-                            isActive ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-accent-foreground'
+                            "h-6 w-6 shrink-0",
+                            isActive
+                              ? "text-primary-foreground"
+                              : "text-muted-foreground group-hover:text-accent-foreground",
                           )}
                           aria-hidden="true"
                         />

@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useAuth } from '@/contexts/AuthContext';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
+import { useAuth } from "@/contexts/AuthContext";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,11 +10,11 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { ModeToggle } from '@/components/ui/mode-toggle';
-import { MobileSidebar } from './sidebar';
-import { LogOut, User, Shield } from 'lucide-react';
-import Link from 'next/link';
+} from "@/components/ui/dropdown-menu";
+import { ModeToggle } from "@/components/ui/mode-toggle";
+import { MobileSidebar } from "./sidebar";
+import { LogOut, User, Shield } from "lucide-react";
+import Link from "next/link";
 
 export function Header() {
   const { user, logout, checkAdmin } = useAuth();
@@ -40,7 +40,7 @@ export function Header() {
               <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                 <Avatar className="h-8 w-8">
                   <AvatarFallback>
-                    {user ? getInitials(user.email) : '?'}
+                    {user ? getInitials(user.email) : "?"}
                   </AvatarFallback>
                 </Avatar>
               </Button>
@@ -48,14 +48,16 @@ export function Header() {
             <DropdownMenuContent className="w-56" align="end" forceMount>
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">{user?.email}</p>
+                  <p className="text-sm font-medium leading-none">
+                    {user?.email}
+                  </p>
                   <p className="text-xs leading-none text-muted-foreground">
                     {checkAdmin() ? (
                       <span className="flex items-center gap-1">
                         <Shield className="h-3 w-3" /> Administrator
                       </span>
                     ) : (
-                      'User'
+                      "User"
                     )}
                   </p>
                 </div>
@@ -68,7 +70,10 @@ export function Header() {
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
+              <DropdownMenuItem
+                onClick={handleLogout}
+                className="cursor-pointer"
+              >
                 <LogOut className="mr-2 h-4 w-4" />
                 Log out
               </DropdownMenuItem>

@@ -1,18 +1,21 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
-import { Sidebar } from './sidebar';
-import { Header } from './header';
-import { Toaster } from '@/components/ui/sonner';
+import { useEffect } from "react";
+import { useRouter, usePathname } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
+import { Sidebar } from "./sidebar";
+import { Header } from "./header";
+import { Toaster } from "@/components/ui/sonner";
 
 interface ProtectedLayoutProps {
   children: React.ReactNode;
   requireAdmin?: boolean;
 }
 
-export function ProtectedLayout({ children, requireAdmin = false }: ProtectedLayoutProps) {
+export function ProtectedLayout({
+  children,
+  requireAdmin = false,
+}: ProtectedLayoutProps) {
   const { isAuthenticated, isLoading, checkAdmin } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -20,9 +23,9 @@ export function ProtectedLayout({ children, requireAdmin = false }: ProtectedLay
   useEffect(() => {
     if (!isLoading) {
       if (!isAuthenticated) {
-        router.push('/login');
+        router.push("/login");
       } else if (requireAdmin && !checkAdmin()) {
-        router.push('/dashboard');
+        router.push("/dashboard");
       }
     }
   }, [isAuthenticated, isLoading, requireAdmin, checkAdmin, router, pathname]);

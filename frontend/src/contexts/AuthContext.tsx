@@ -1,8 +1,14 @@
-'use client';
+"use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, UserRole } from '@/types';
-import { authApi } from '@/lib/api';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
+import { User, UserRole } from "@/types";
+import { authApi } from "@/lib/api";
 
 interface AuthContextType {
   user: User | null;
@@ -23,15 +29,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Check for existing session on mount
   useEffect(() => {
     const initAuth = async () => {
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem("access_token");
       if (token) {
         try {
           const response = await authApi.getMe();
           setUser(response.data);
         } catch (error) {
           // Token invalid, clear storage
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
+          localStorage.removeItem("access_token");
+          localStorage.removeItem("refresh_token");
         }
       }
       setIsLoading(false);
@@ -44,8 +50,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const response = await authApi.login(email, password);
     const { access_token, refresh_token, user } = response.data;
 
-    localStorage.setItem('access_token', access_token);
-    localStorage.setItem('refresh_token', refresh_token);
+    localStorage.setItem("access_token", access_token);
+    localStorage.setItem("refresh_token", refresh_token);
     setUser(user);
   };
 
@@ -55,8 +61,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       // Ignore error, still clear local state
     } finally {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
       setUser(null);
     }
   };
@@ -66,12 +72,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await authApi.getMe();
       setUser(response.data);
     } catch (error) {
-      console.error('Failed to refresh user:', error);
+      console.error("Failed to refresh user:", error);
     }
   };
 
   const checkAdmin = () => {
-    return user?.role === 'admin';
+    return user?.role === "admin";
   };
 
   return (
@@ -94,7 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 }
