@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -16,30 +15,48 @@ func RegisterRoutes(r *gin.Engine) {
 		log.Printf("Serving static files from: %s", staticPath)
 		// Check if static directory exists
 		if _, err := os.Stat(staticPath); !os.IsNotExist(err) {
-			// Serve Next.js static files
-			r.Static("/_next", filepath.Join(staticPath, "_next"))
-			r.StaticFile("/favicon.ico", filepath.Join(staticPath, "favicon.ico"))
 
-			// Serve page directories (login, dashboard, etc.)
-			r.Static("/login", filepath.Join(staticPath, "login"))
-			r.Static("/dashboard", filepath.Join(staticPath, "dashboard"))
-			r.Static("/users", filepath.Join(staticPath, "users"))
-			r.Static("/profile", filepath.Join(staticPath, "profile"))
-			r.Static("/auth", filepath.Join(staticPath, "auth"))
+			// Dynamically serve files and directories
+			entries, err := os.ReadDir(staticPath)
+			if err == nil {
+				for _, entry := range entries {
+					name := entry.Name()
+					if name == "index.html" {
+						continue
+					}
+
+					fullPath := filepath.Join(staticPath, name)
+					if entry.IsDir() {
+						r.Static("/"+name, fullPath)
+					} else {
+						r.StaticFile("/"+name, fullPath)
+					}
+				}
+			}
 
 			// Serve index.html for root path
 			r.GET("/", func(c *gin.Context) {
 				c.File(filepath.Join(staticPath, "index.html"))
 			})
 
-			// Serve index.html for all non-API, non-static routes (SPA fallback)
+			// Return 404 page for all unmatched routes
 			r.NoRoute(func(c *gin.Context) {
-				path := c.Request.URL.Path
-				if !strings.HasPrefix(path, "/api/") && !strings.HasPrefix(path, "/_next/") {
-					c.File(filepath.Join(staticPath, "index.html"))
-				} else {
-					c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
+				// Try 404.html first
+				p404 := filepath.Join(staticPath, "404.html")
+				if _, err := os.Stat(p404); err == nil {
+					c.File(p404)
+					return
 				}
+
+				// Try 404/index.html
+				p404Index := filepath.Join(staticPath, "404", "index.html")
+				if _, err := os.Stat(p404Index); err == nil {
+					c.File(p404Index)
+					return
+				}
+
+				// Fallback to JSON
+				c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
 			})
 		} else {
 			log.Printf("Warning: Static path not found: %s", staticPath)
