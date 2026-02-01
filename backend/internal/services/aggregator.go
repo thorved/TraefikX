@@ -10,21 +10,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/traefik/traefik/v3/pkg/config/dynamic"
 	"github.com/traefikx/backend/internal/models"
 	"gorm.io/gorm"
 )
-
-// TraefikHTTPConfig represents the Traefik HTTP configuration structure
-type TraefikHTTPConfig struct {
-	Routers     map[string]interface{} `json:"routers,omitempty"`
-	Services    map[string]interface{} `json:"services,omitempty"`
-	Middlewares map[string]interface{} `json:"middlewares,omitempty"`
-}
-
-// TraefikConfig represents the full Traefik configuration
-type TraefikConfig struct {
-	HTTP TraefikHTTPConfig `json:"http,omitempty"`
-}
 
 // ProviderStatus represents the current status of a provider
 type ProviderStatus struct {
@@ -35,7 +24,7 @@ type ProviderStatus struct {
 	IsActive        bool
 	LastFetched     *time.Time
 	LastError       string
-	Config          *TraefikConfig
+	Config          *dynamic.HTTPConfiguration
 	RouterCount     int
 	ServiceCount    int
 	MiddlewareCount int
@@ -135,6 +124,12 @@ func (a *AggregatorService) startPolling(provider *models.HTTPProvider) {
 	}(provider.ID)
 }
 
+// DynamicConfig represents the full Traefik dynamic configuration
+type DynamicConfig struct {
+	HTTP *dynamic.HTTPConfiguration `json:"http,omitempty"`
+	TCP  *dynamic.TCPConfiguration  `json:"tcp,omitempty"`
+}
+
 // fetchProvider fetches configuration from a provider
 func (a *AggregatorService) fetchProvider(provider *models.HTTPProvider) {
 	log.Printf("Fetching from provider %s (%s)", provider.Name, provider.URL)
@@ -157,16 +152,23 @@ func (a *AggregatorService) fetchProvider(provider *models.HTTPProvider) {
 		return
 	}
 
-	var config TraefikConfig
+	// Parse into official Traefik types
+	var config DynamicConfig
 	if err := json.Unmarshal(body, &config); err != nil {
 		a.updateProviderError(provider, fmt.Sprintf("JSON parse error: %v", err))
 		return
 	}
 
 	// Count items
-	routerCount := len(config.HTTP.Routers)
-	serviceCount := len(config.HTTP.Services)
-	middlewareCount := len(config.HTTP.Middlewares)
+	routerCount := 0
+	serviceCount := 0
+	middlewareCount := 0
+
+	if config.HTTP != nil {
+		routerCount = len(config.HTTP.Routers)
+		serviceCount = len(config.HTTP.Services)
+		middlewareCount = len(config.HTTP.Middlewares)
+	}
 
 	// Update database
 	now := time.Now()
@@ -181,8 +183,12 @@ func (a *AggregatorService) fetchProvider(provider *models.HTTPProvider) {
 		log.Printf("Failed to save provider %s: %v", provider.Name, err)
 	}
 
-	// Update in-memory status
+	// Update in-memory status with official types
 	a.statusesMu.Lock()
+	httpConfig := &dynamic.HTTPConfiguration{}
+	if config.HTTP != nil {
+		httpConfig = config.HTTP
+	}
 	a.statuses[provider.ID] = &ProviderStatus{
 		ID:              provider.ID,
 		Name:            provider.Name,
@@ -191,7 +197,7 @@ func (a *AggregatorService) fetchProvider(provider *models.HTTPProvider) {
 		IsActive:        provider.IsActive,
 		LastFetched:     provider.LastFetched,
 		LastError:       "",
-		Config:          &config,
+		Config:          httpConfig,
 		RouterCount:     routerCount,
 		ServiceCount:    serviceCount,
 		MiddlewareCount: middlewareCount,
@@ -271,17 +277,38 @@ func (a *AggregatorService) GetStatuses() []ProviderStatus {
 	return statuses
 }
 
+// MergedConfig represents the merged configuration from all sources
+type MergedConfig struct {
+	HTTP *dynamic.HTTPConfiguration `json:"http,omitempty"`
+}
+
+// ConflictInfo represents a configuration conflict
+type ConflictInfo struct {
+	Type           string `json:"type"`
+	Name           string `json:"name"`
+	Source         string `json:"source"`
+	OverriddenBy   string `json:"overridden_by"`
+	SourcePriority int    `json:"source_priority"`
+}
+
 // GetMergedConfig returns the merged configuration from all active providers
 // Priority: Local DB > Provider (by priority, higher first)
-func (a *AggregatorService) GetMergedConfig(localRouters, localServices, localMiddlewares map[string]interface{}) (*TraefikConfig, []ConflictInfo) {
+func (a *AggregatorService) GetMergedConfig(
+	localRouters map[string]*dynamic.Router,
+	localServices map[string]*dynamic.Service,
+	localMiddlewares map[string]*dynamic.Middleware,
+	localServersTransports map[string]*dynamic.ServersTransport,
+) (*MergedConfig, []ConflictInfo) {
 	a.statusesMu.RLock()
 	defer a.statusesMu.RUnlock()
 
-	merged := &TraefikConfig{
-		HTTP: TraefikHTTPConfig{
-			Routers:     make(map[string]interface{}),
-			Services:    make(map[string]interface{}),
-			Middlewares: make(map[string]interface{}),
+	merged := &MergedConfig{
+		HTTP: &dynamic.HTTPConfiguration{
+			Routers:           make(map[string]*dynamic.Router),
+			Services:          make(map[string]*dynamic.Service),
+			Middlewares:       make(map[string]*dynamic.Middleware),
+			Models:            make(map[string]*dynamic.Model),
+			ServersTransports: make(map[string]*dynamic.ServersTransport),
 		},
 	}
 	conflicts := []ConflictInfo{}
@@ -290,6 +317,7 @@ func (a *AggregatorService) GetMergedConfig(localRouters, localServices, localMi
 	routerSources := make(map[string]string)
 	serviceSources := make(map[string]string)
 	middlewareSources := make(map[string]string)
+	serversTransportSources := make(map[string]string)
 
 	// Add local config first (highest priority)
 	for name, router := range localRouters {
@@ -303,6 +331,10 @@ func (a *AggregatorService) GetMergedConfig(localRouters, localServices, localMi
 	for name, middleware := range localMiddlewares {
 		merged.HTTP.Middlewares[name] = middleware
 		middlewareSources[name] = "local"
+	}
+	for name, st := range localServersTransports {
+		merged.HTTP.ServersTransports[name] = st
+		serversTransportSources[name] = "local"
 	}
 
 	// Get sorted statuses by priority (higher first)
@@ -323,7 +355,7 @@ func (a *AggregatorService) GetMergedConfig(localRouters, localServices, localMi
 		}
 
 		// Merge routers
-		for name, router := range status.Config.HTTP.Routers {
+		for name, router := range status.Config.Routers {
 			if existingSource, exists := routerSources[name]; exists {
 				if existingSource != status.Name {
 					conflicts = append(conflicts, ConflictInfo{
@@ -341,7 +373,7 @@ func (a *AggregatorService) GetMergedConfig(localRouters, localServices, localMi
 		}
 
 		// Merge services
-		for name, service := range status.Config.HTTP.Services {
+		for name, service := range status.Config.Services {
 			if existingSource, exists := serviceSources[name]; exists {
 				if existingSource != status.Name {
 					conflicts = append(conflicts, ConflictInfo{
@@ -359,7 +391,7 @@ func (a *AggregatorService) GetMergedConfig(localRouters, localServices, localMi
 		}
 
 		// Merge middlewares
-		for name, middleware := range status.Config.HTTP.Middlewares {
+		for name, middleware := range status.Config.Middlewares {
 			if existingSource, exists := middlewareSources[name]; exists {
 				if existingSource != status.Name {
 					conflicts = append(conflicts, ConflictInfo{
@@ -375,18 +407,27 @@ func (a *AggregatorService) GetMergedConfig(localRouters, localServices, localMi
 			merged.HTTP.Middlewares[name] = middleware
 			middlewareSources[name] = status.Name
 		}
+
+		// Merge servers transports
+		for name, st := range status.Config.ServersTransports {
+			if existingSource, exists := serversTransportSources[name]; exists {
+				if existingSource != status.Name {
+					conflicts = append(conflicts, ConflictInfo{
+						Type:           "serversTransport",
+						Name:           name,
+						Source:         status.Name,
+						OverriddenBy:   existingSource,
+						SourcePriority: status.Priority,
+					})
+				}
+				continue
+			}
+			merged.HTTP.ServersTransports[name] = st
+			serversTransportSources[name] = status.Name
+		}
 	}
 
 	return merged, conflicts
-}
-
-// ConflictInfo represents a configuration conflict
-type ConflictInfo struct {
-	Type           string `json:"type"`
-	Name           string `json:"name"`
-	Source         string `json:"source"`
-	OverriddenBy   string `json:"overridden_by"`
-	SourcePriority int    `json:"source_priority"`
 }
 
 // GetProviderResponse returns the last cached response for a provider

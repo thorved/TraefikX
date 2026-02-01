@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/traefik/traefik/v3/pkg/config/dynamic"
+	"github.com/traefik/traefik/v3/pkg/types"
 	"github.com/traefikx/backend/internal/models"
 	"github.com/traefikx/backend/internal/services"
 	"gorm.io/gorm"
@@ -279,33 +281,43 @@ func (h *HTTPProviderHandler) GetMergedConfig(c *gin.Context) {
 	var middlewares []models.Middleware
 	h.db.Find(&middlewares)
 
-	// Convert to Traefik format
-	localRouters := make(map[string]interface{})
+	// Convert to official Traefik types
+	localRouters := make(map[string]*dynamic.Router)
 	for _, router := range routers {
 		if !router.IsActive {
 			continue
 		}
-		localRouters[router.Name] = convertRouterToTraefikFormat(&router)
+		localRouters[router.Name] = convertRouterModelToDynamic(&router)
 	}
 
-	localServices := make(map[string]interface{})
+	localServices := make(map[string]*dynamic.Service)
 	for _, service := range services {
 		if !service.IsActive {
 			continue
 		}
-		localServices[service.Name] = convertServiceToTraefikFormat(&service)
+		localServices[service.Name] = convertServiceModelToDynamic(&service)
 	}
 
-	localMiddlewares := make(map[string]interface{})
+	localMiddlewares := make(map[string]*dynamic.Middleware)
 	for _, middleware := range middlewares {
 		if !middleware.IsActive {
 			continue
 		}
-		localMiddlewares[middleware.Name] = convertMiddlewareToTraefikFormat(&middleware)
+		mw := convertMiddlewareModelToDynamic(&middleware)
+		if mw != nil {
+			localMiddlewares[middleware.Name] = mw
+		}
 	}
 
-	// Get merged config
-	mergedConfig, conflicts := h.aggregator.GetMergedConfig(localRouters, localServices, localMiddlewares)
+	localServersTransports := make(map[string]*dynamic.ServersTransport)
+
+	// Get merged config using official types
+	mergedConfig, conflicts := h.aggregator.GetMergedConfig(
+		localRouters,
+		localServices,
+		localMiddlewares,
+		localServersTransports,
+	)
 
 	c.JSON(http.StatusOK, gin.H{
 		"config":    mergedConfig,
@@ -394,9 +406,48 @@ func convertRouterToTraefikFormat(router *models.Router) map[string]interface{} 
 	}
 
 	if router.TLSEnabled {
-		result["tls"] = map[string]interface{}{
+		tlsConfig := map[string]interface{}{
 			"certResolver": router.TLSCertResolver,
 		}
+
+		// Add domains from hostnames
+		if len(router.Hostnames) > 0 {
+			hostnames := make([]string, len(router.Hostnames))
+			for i, h := range router.Hostnames {
+				hostnames[i] = h.Hostname
+			}
+
+			if len(hostnames) > 0 {
+				mainDomain := hostnames[0]
+				sans := []string{}
+
+				// Add wildcard for the main domain
+				parts := strings.Split(mainDomain, ".")
+				if len(parts) >= 2 {
+					wildcard := "*." + strings.Join(parts[1:], ".")
+					sans = append(sans, wildcard)
+				}
+
+				// Add any additional hostnames as SANs with wildcards
+				for i := 1; i < len(hostnames); i++ {
+					sans = append(sans, hostnames[i])
+					parts := strings.Split(hostnames[i], ".")
+					if len(parts) >= 2 {
+						wildcard := "*." + strings.Join(parts[1:], ".")
+						sans = append(sans, wildcard)
+					}
+				}
+
+				tlsConfig["domains"] = []map[string]interface{}{
+					{
+						"main": mainDomain,
+						"sans": sans,
+					},
+				}
+			}
+		}
+
+		result["tls"] = tlsConfig
 	}
 
 	return result
@@ -477,6 +528,146 @@ func convertMiddlewareToTraefikFormat(middleware *models.Middleware) map[string]
 		return map[string]interface{}{
 			"addPrefix": map[string]interface{}{
 				"prefix": config.Prefix,
+			},
+		}
+	default:
+		return nil
+	}
+}
+
+// New conversion functions using official Traefik types
+
+func convertRouterModelToDynamic(router *models.Router) *dynamic.Router {
+	if len(router.Hostnames) == 0 {
+		return nil
+	}
+
+	// Build rule from hostnames
+	rule := buildRuleFromHostnames(router.Hostnames)
+	entryPoints := splitEntryPoints(router.EntryPoints)
+
+	middlewareNames := []string{}
+	if router.RedirectHTTPS {
+		middlewareNames = append(middlewareNames, fmt.Sprintf("%s-redirect-https", router.Name))
+	}
+	for _, rm := range router.Middlewares {
+		if rm.Middleware.IsActive {
+			middlewareNames = append(middlewareNames, rm.Middleware.Name)
+		}
+	}
+
+	dynRouter := &dynamic.Router{
+		EntryPoints: entryPoints,
+		Rule:        rule,
+		Service:     router.Service.Name,
+		Middlewares: middlewareNames,
+	}
+
+	if router.TLSEnabled {
+		tlsConfig := &dynamic.RouterTLSConfig{
+			CertResolver: router.TLSCertResolver,
+		}
+
+		// Add domains from hostnames
+		if len(router.Hostnames) > 0 {
+			hostnames := make([]string, len(router.Hostnames))
+			for i, h := range router.Hostnames {
+				hostnames[i] = h.Hostname
+			}
+
+			if len(hostnames) > 0 {
+				mainDomain := hostnames[0]
+				sans := []string{}
+
+				// Add wildcard for the main domain
+				parts := strings.Split(mainDomain, ".")
+				if len(parts) >= 2 {
+					wildcard := "*." + strings.Join(parts[1:], ".")
+					sans = append(sans, wildcard)
+				}
+
+				// Add any additional hostnames as SANs with wildcards
+				for i := 1; i < len(hostnames); i++ {
+					sans = append(sans, hostnames[i])
+					parts := strings.Split(hostnames[i], ".")
+					if len(parts) >= 2 {
+						wildcard := "*." + strings.Join(parts[1:], ".")
+						sans = append(sans, wildcard)
+					}
+				}
+
+				tlsConfig.Domains = []types.Domain{
+					{
+						Main: mainDomain,
+						SANs: sans,
+					},
+				}
+			}
+		}
+
+		dynRouter.TLS = tlsConfig
+	}
+
+	return dynRouter
+}
+
+func convertServiceModelToDynamic(service *models.Service) *dynamic.Service {
+	servers := make([]dynamic.Server, len(service.Servers))
+	for i, s := range service.Servers {
+		servers[i] = dynamic.Server{
+			URL: s.URL,
+		}
+	}
+
+	passHostHeader := service.PassHostHeader
+	dynService := &dynamic.Service{
+		LoadBalancer: &dynamic.ServersLoadBalancer{
+			Servers:        servers,
+			PassHostHeader: &passHostHeader,
+		},
+	}
+
+	if service.HealthCheckEnabled && service.HealthCheckPath != "" {
+		dynService.LoadBalancer.HealthCheck = &dynamic.ServerHealthCheck{
+			Path: service.HealthCheckPath,
+		}
+	}
+
+	return dynService
+}
+
+func convertMiddlewareModelToDynamic(middleware *models.Middleware) *dynamic.Middleware {
+	var config models.MiddlewareConfig
+	if err := json.Unmarshal([]byte(middleware.Config), &config); err != nil {
+		return nil
+	}
+
+	switch middleware.Type {
+	case "redirectScheme":
+		return &dynamic.Middleware{
+			RedirectScheme: &dynamic.RedirectScheme{
+				Scheme:    config.Scheme,
+				Port:      config.Port,
+				Permanent: config.Permanent,
+			},
+		}
+	case "headers":
+		return &dynamic.Middleware{
+			Headers: &dynamic.Headers{
+				CustomRequestHeaders:  config.CustomRequestHeaders,
+				CustomResponseHeaders: config.CustomResponseHeaders,
+			},
+		}
+	case "stripPrefix":
+		return &dynamic.Middleware{
+			StripPrefix: &dynamic.StripPrefix{
+				Prefixes: config.Prefixes,
+			},
+		}
+	case "addPrefix":
+		return &dynamic.Middleware{
+			AddPrefix: &dynamic.AddPrefix{
+				Prefix: config.Prefix,
 			},
 		}
 	default:
