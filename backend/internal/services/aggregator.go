@@ -127,7 +127,6 @@ func (a *AggregatorService) startPolling(provider *models.HTTPProvider) {
 // DynamicConfig represents the full Traefik dynamic configuration
 type DynamicConfig struct {
 	HTTP *dynamic.HTTPConfiguration `json:"http,omitempty"`
-	TCP  *dynamic.TCPConfiguration  `json:"tcp,omitempty"`
 }
 
 // fetchProvider fetches configuration from a provider

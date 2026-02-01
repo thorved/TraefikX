@@ -8,7 +8,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/traefik/traefik/v3/pkg/config/dynamic"
-	"github.com/traefik/traefik/v3/pkg/types"
 	"github.com/traefikx/backend/internal/models"
 	"github.com/traefikx/backend/internal/services"
 	"gorm.io/gorm"
@@ -28,13 +27,15 @@ func NewTraefikProviderHandler(db *gorm.DB, aggregator *services.AggregatorServi
 // This merges local configuration with external endpoint configurations
 // Priority: Local (highest) > External endpoints (by priority)
 func (h *TraefikProviderHandler) GenerateConfig(c *gin.Context) {
-	// Initialize config with official Traefik types
-	config := &dynamic.HTTPConfiguration{
-		Routers:           make(map[string]*dynamic.Router),
-		Services:          make(map[string]*dynamic.Service),
-		Middlewares:       make(map[string]*dynamic.Middleware),
-		Models:            make(map[string]*dynamic.Model),
-		ServersTransports: make(map[string]*dynamic.ServersTransport),
+	// Initialize config with official Traefik types - wrap HTTP config properly
+	config := &dynamic.Configuration{
+		HTTP: &dynamic.HTTPConfiguration{
+			Routers:           make(map[string]*dynamic.Router),
+			Services:          make(map[string]*dynamic.Service),
+			Middlewares:       make(map[string]*dynamic.Middleware),
+			Models:            make(map[string]*dynamic.Model),
+			ServersTransports: make(map[string]*dynamic.ServersTransport),
+		},
 	}
 
 	// Fetch all active routers with their associations
@@ -90,9 +91,10 @@ func (h *TraefikProviderHandler) GenerateConfig(c *gin.Context) {
 			}
 		}
 
+		// TLS config removed for testing
 		// Build TLS config with domains
 		var tlsConfig *dynamic.RouterTLSConfig
-		if router.TLSEnabled {
+		/* if router.TLSEnabled {
 			tlsConfig = &dynamic.RouterTLSConfig{
 				CertResolver: router.TLSCertResolver,
 			}
@@ -133,7 +135,7 @@ func (h *TraefikProviderHandler) GenerateConfig(c *gin.Context) {
 					}
 				}
 			}
-		}
+		} */
 
 		// Add router to config
 		dynRouter := &dynamic.Router{
@@ -143,13 +145,13 @@ func (h *TraefikProviderHandler) GenerateConfig(c *gin.Context) {
 			Middlewares: middlewareNames,
 			TLS:         tlsConfig,
 		}
-		config.Routers[router.Name] = dynRouter
+		config.HTTP.Routers[router.Name] = dynRouter
 		localRouters[router.Name] = dynRouter
 
 		// Add service to config
-		if _, exists := config.Services[router.Service.Name]; !exists {
+		if _, exists := config.HTTP.Services[router.Service.Name]; !exists {
 			serviceConfig := buildServiceConfig(&router.Service)
-			config.Services[router.Service.Name] = serviceConfig
+			config.HTTP.Services[router.Service.Name] = serviceConfig
 			localServices[router.Service.Name] = serviceConfig
 		}
 	}
@@ -158,7 +160,7 @@ func (h *TraefikProviderHandler) GenerateConfig(c *gin.Context) {
 	for _, middleware := range middlewares {
 		middlewareConfig := buildMiddlewareConfig(&middleware)
 		if middlewareConfig != nil {
-			config.Middlewares[middleware.Name] = middlewareConfig
+			config.HTTP.Middlewares[middleware.Name] = middlewareConfig
 			localMiddlewares[middleware.Name] = middlewareConfig
 		}
 	}
@@ -174,23 +176,19 @@ func (h *TraefikProviderHandler) GenerateConfig(c *gin.Context) {
 					Permanent: true,
 				},
 			}
-			config.Middlewares[middlewareName] = mw
+			config.HTTP.Middlewares[middlewareName] = mw
 			localMiddlewares[middlewareName] = mw
 		}
 	}
 
 	// Merge external endpoint configurations (if aggregator is available)
 	if h.aggregator != nil {
-		config = h.mergeExternalConfigs(config, localRouters, localServices, localMiddlewares, localServersTransports)
+		mergedHTTP := h.mergeExternalConfigs(config.HTTP, localRouters, localServices, localMiddlewares, localServersTransports)
+		config.HTTP = mergedHTTP
 	}
 
-	// Wrap in the full dynamic config structure
-	output := &models.TraefikDynamicConfig{
-		HTTP: config,
-		TCP:  &dynamic.TCPConfiguration{},
-	}
-
-	c.JSON(http.StatusOK, output)
+	// Return full configuration wrapped with "http" key
+	c.JSON(http.StatusOK, config)
 }
 
 // mergeExternalConfigs merges configurations from external endpoints
