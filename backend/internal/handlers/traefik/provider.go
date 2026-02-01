@@ -39,6 +39,7 @@ type RouterConfig struct {
 	Service     string     `json:"service,omitempty"`
 	Middlewares []string   `json:"middlewares,omitempty"`
 	TLS         *TLSConfig `json:"tls,omitempty"`
+	Priority    int        `json:"priority,omitempty"`
 }
 
 type TLSConfig struct {
@@ -257,6 +258,9 @@ func convertRouterConfigToMap(router *RouterConfig) map[string]interface{} {
 			"certResolver": router.TLS.CertResolver,
 		}
 	}
+	if router.Priority > 0 {
+		result["priority"] = router.Priority
+	}
 	return result
 }
 
@@ -349,6 +353,12 @@ func convertMapToRouterConfig(routerMap map[string]interface{}) *RouterConfig {
 		if cr, ok := tls["certResolver"].(string); ok {
 			config.TLS.CertResolver = cr
 		}
+	}
+	// Handle priority - can be int or float64 from JSON unmarshaling
+	if priority, ok := routerMap["priority"].(int); ok {
+		config.Priority = priority
+	} else if priority, ok := routerMap["priority"].(float64); ok {
+		config.Priority = int(priority)
 	}
 	return config
 }
